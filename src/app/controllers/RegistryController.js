@@ -23,11 +23,6 @@ class RegistryController {
           as: 'student',
           attributes: ['id', 'name'],
         },
-        {
-          model: Plan,
-          as: 'plan',
-          attributes: ['id', 'title'],
-        },
       ],
     });
 
@@ -45,21 +40,21 @@ class RegistryController {
     }
 
     const { plan_id, start_date } = req.body;
-    const { price, duration } = Plan.findOne({ where: plan_id });
+
+    const plan = await Plan.findByPk(plan_id);
 
     const hourStart = startOfHour(parseISO(start_date));
 
-    const monthFinished = addMonths(parseISO(start_date), duration);
-    const priceFinal = duration * price;
+    const end_date = addMonths(parseISO(start_date), plan.duration);
+    const priceFinal = plan.duration * plan.price;
 
     /**
      * Create registry and send to database
      */
     const registries = await Registry.create({
       student_id: req.params.studentId,
-      plan_id,
       start_date: hourStart,
-      end_date: monthFinished,
+      end_date,
       price: priceFinal,
     });
 

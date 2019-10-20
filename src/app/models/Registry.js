@@ -19,7 +19,7 @@ class Registry extends Model {
   be lost trying to figure out which was one and which was another */
   static associate(models) {
     this.belongsTo(models.Student, { foreignKey: 'student_id', as: 'student' });
-    this.belongsTo(models.User, { foreignKey: 'plan_id', as: 'plan' });
+    this.belongsTo(models.Plan, { foreignKey: 'plan_id', as: 'plan' });
   }
 }
 
