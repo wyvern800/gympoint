@@ -3,10 +3,9 @@ import { startOfHour, parseISO, addMonths } from 'date-fns';
 import Student from '../models/Student';
 import Plan from '../models/Plan';
 import Registry from '../models/Registry';
-/* import Notification from '../schemas/Notification';
 
-import CancellationMail from '../jobs/CancellationMail';
-import Queue from '../../lib/Queue'; */
+import RegistrationMail from '../jobs/RegistrationMail';
+import Queue from '../../lib/Queue';
 
 class RegistryController {
   async index(req, res) {
@@ -23,6 +22,11 @@ class RegistryController {
           as: 'student',
           attributes: ['id', 'name'],
         },
+        {
+          model: Plan,
+          as: 'plan',
+          attributes: ['id', 'title'],
+        },
       ],
     });
 
@@ -31,6 +35,7 @@ class RegistryController {
 
   async store(req, res) {
     const schema = Yup.object().shape({
+      student_id: Yup.number().required(),
       plan_id: Yup.number().required(),
       start_date: Yup.date().required(),
     });
@@ -39,7 +44,7 @@ class RegistryController {
       return res.status(400).json({ error: 'Validation fails' });
     }
 
-    const { plan_id, start_date } = req.body;
+    const { student_id, plan_id, start_date } = req.body;
 
     const plan = await Plan.findByPk(plan_id);
 
@@ -52,74 +57,86 @@ class RegistryController {
      * Create registry and send to database
      */
     const registries = await Registry.create({
-      student_id: req.params.studentId,
+      student_id,
+      plan_id,
       start_date: hourStart,
       end_date,
       price: priceFinal,
     });
 
-    /**
-     * Notify appointment provider
-     */
-    /* const user = await User.findByPk(req.userId);
-    const formattedDate = format(
-      hourStart,
-      "'dia' dd 'de' MMMM', às' H:mm 'h'",
-      { locale: pt }
-    ); */
+    const registry = await Registry.findOne({
+      where: { id: registries.id },
 
-    /* await Notification.create({
-      content: `Novo agendamento de ${user.name} para o ${formattedDate}`,
-      user: provider_id,
-    }); */
+      include: [
+        {
+          model: Student,
+          as: 'student',
+          attributes: ['id', 'name', 'email'],
+        },
+        {
+          model: Plan,
+          as: 'plan',
+          attributes: ['id', 'title', 'price', 'duration'],
+        },
+      ],
+    });
+
+    Queue.add(RegistrationMail.key, {
+      registry,
+    });
 
     return res.json(registries);
   }
 
-  /* async delete(req, res) {
-    const appointment = await Appointment.findByPk(req.params.id, {
-      include: [
-        {
-          model: User,
-          as: 'provider',
-          attributes: ['name', 'email'],
-        },
-        {
-          model: User,
-          as: 'user',
-          attributes: ['name'],
-        },
-      ],
-    }); */
-
-  /**
-   * Will delete only if the deletion-willing user ID is the same as the
-   * creator of the appointment
-   */
-  /* if (appointment.user_id !== req.userId) {
-      return res.status(400).json({
-        error: 'Insufficient permissions to cancel this appointment',
-      });
-    }
-
-    const dateWithSub = subHours(appointment.date, 2);
-
-    if (isBefore(dateWithSub, new Date())) {
-      return res.status(401).json({
-        error: 'You can only cancel appointments 2 hours in advance',
-      });
-    }
-
-    appointment.cancelled_at = new Date();
-
-    await appointment.save();
-
-    await Queue.add(CancellationMail.key, {
-      appointment,
+  async update(req, res) {
+    const schema = Yup.object().shape({
+      student_id: Yup.number().integer(),
+      plan_id: Yup.number().integer(),
+      start_date: Yup.date(),
     });
 
-    return res.json(appointment);
-  } */
+    if (!(await schema.isValid)) {
+      return res
+        .status(400)
+        .json({ error: 'There are problems with validation' });
+    }
+
+    const { student_id, plan_id, start_date } = req.body;
+    const plan = await Plan.findByPk(plan_id);
+    const hourStart = startOfHour(parseISO(start_date));
+
+    const end_date = addMonths(parseISO(start_date), plan.duration);
+    const priceFinal = plan.duration * plan.price;
+
+    /**
+     * Get all values of 'req.body' and unstructures
+     */
+    await Registry.update(
+      { ...req.body, end_date, price: priceFinal },
+      {
+        where: { id: student_id },
+      }
+    );
+
+    return res.json({
+      student_id: req.params.studentId,
+      plan_id,
+      start_date: hourStart,
+      end_date,
+      price: priceFinal,
+    });
+  }
+
+  async delete(req, res) {
+    const { studentId } = req.params;
+    const registry = await Registry.findByPk(studentId);
+
+    await registry.destroy({ where: { studentId } });
+
+    await registry.save();
+
+    return res.status(400).json({ ok: 'Registry was succesfully deleted!' });
+  }
 }
 
 export default new RegistryController();

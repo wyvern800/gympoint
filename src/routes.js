@@ -7,6 +7,9 @@ import StudentController from './app/controllers/StudentController';
 import SessionController from './app/controllers/SessionController';
 import PlanController from './app/controllers/PlanController';
 import RegistryController from './app/controllers/RegistryController';
+import CheckinController from './app/controllers/CheckinController';
+import HelpOrderController from './app/controllers/HelpOrderController';
+import PendingHelpOrderController from './app/controllers/PendingHelpOrderController';
 
 import authMiddleware from './app/middlewares/auth';
 
@@ -20,6 +23,10 @@ routes.use(authMiddleware);
 routes.post('/students', StudentController.store);
 // PUT - update student
 routes.put('/students', StudentController.update);
+// GET - list checkin
+routes.get('/students/:studentId/checkins', CheckinController.index);
+// POST - create checkin
+routes.post('/students/:studentId/checkins', CheckinController.store);
 
 // GET - list plans
 routes.get('/plans', PlanController.index);
@@ -33,10 +40,20 @@ routes.delete('/plans/:planId', PlanController.delete);
 // GET - list registers
 routes.get('/registries', RegistryController.index);
 // POST - create registers
-routes.post('/registries/:studentId', RegistryController.store);
+routes.post('/registries', RegistryController.store);
 // PUT - update registers
-//routes.put('/registry/:studentId', RegistryController.update);
+routes.put('/registries', RegistryController.update);
 // DELETE - delete registers
-//routes.delete('/registry/:studentId', RegistryController.delete);
+routes.delete('/registries/:studentId', RegistryController.delete);
+
+// GET - list of help orders
+routes.get('/students/:studentId/help-orders', HelpOrderController.index);
+// POST - create help order
+routes.post('/students/:studentId/help-orders', HelpOrderController.store);
+
+// GET - list of help orders without answer
+routes.get('/students/help-orders/pending', PendingHelpOrderController.index);
+// POST - gym answering route
+routes.put('/help-orders/:studentId/answer', HelpOrderController.update);
 
 export default routes;
